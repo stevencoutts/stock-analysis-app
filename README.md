@@ -1,38 +1,27 @@
-# Stock Analysis App
+# Stock Analysis Application
 
-A modern web application for analyzing stocks, managing watchlists, and tracking market performance. Built with React and Docker.
+A web-based application for analyzing stock market data and trends, built with React and Docker.
 
 ## Features
 
-- 📊 Real-time stock price monitoring
-- 📈 Technical analysis tools
-- 📱 Responsive design
-- 👥 User authentication
-- 📋 Customizable watchlists
-- 📊 Market overview dashboard
+- User authentication system
+- Interactive stock data visualization
+- Real-time market data analysis
+- Responsive dashboard interface
+- Secure API integration
 
-## Tech Stack
+## Prerequisites
 
-- Frontend: React.js
-- Routing: React Router
-- Styling: CSS3
-- Containerization: Docker
-- Database: PostgreSQL
-- API: Node.js/Express
+Before you begin, ensure you have installed:
+- [Node.js](https://nodejs.org/) (v18 or higher)
+- [Docker](https://www.docker.com/get-started)
+- [Docker Compose](https://docs.docker.com/compose/install/)
 
-## Getting Started
-
-### Prerequisites
-
-- Node.js (v14 or higher)
-- Docker and Docker Compose
-- npm or yarn
-
-### Installation
+## Installation
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/yourusername/stock-analysis-app.git
+git clone <your-repository-url>
 cd stock-analysis-app
 ```
 
@@ -41,21 +30,32 @@ cd stock-analysis-app
 npm install
 ```
 
-3. Start the development server:
+3. Build and run with Docker:
+```bash
+docker-compose up -d --build
+```
+
+The application will be available at `http://localhost:3000`
+
+## Development
+
+To run the application in development mode:
+
 ```bash
 npm start
 ```
 
-### Docker Setup
+To build for production:
 
-1. Build and run with Docker Compose:
 ```bash
-docker-compose up --build
+npm run build
 ```
 
-2. Access the application:
-- Frontend: http://localhost:3000
-- API: http://localhost:5010
+## Docker Configuration
+
+The application uses a multi-stage Docker build process:
+- Build stage: Node.js environment for building the React application
+- Production stage: Nginx server for serving the static files
 
 ## Project Structure
 
