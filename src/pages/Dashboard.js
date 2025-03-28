@@ -175,15 +175,14 @@ export default function Dashboard() {
         <div className="dashboard-card market-overview">
           <div className="card-header">
             <h2>Market Overview</h2>
-            {lastUpdated && (
-              <div className="last-updated">
-                Last updated: {formatLastUpdated(lastUpdated)}
-                {warning && <span className="warning-text"> ({warning})</span>}
+            {marketData.some(item => !item.realData) && (
+              <div className="data-notice">
+                <span className="warning-icon">⚠️</span> Some data shown is simulated due to API limitations
               </div>
             )}
           </div>
           
-          {loading && !marketData.length ? (
+          {loading ? (
             <div className="loading-spinner">Loading market data...</div>
           ) : error ? (
             <div className="error-message">{error}</div>
@@ -191,21 +190,13 @@ export default function Dashboard() {
             <div className="market-summary">
               {marketData.map((stock) => (
                 <div key={stock.symbol} className="market-item">
-                  {stock.error ? (
-                    <>
-                      <span className="symbol">{stock.symbol}</span>
-                      <span className="error-text">{stock.error}</span>
-                    </>
-                  ) : (
-                    <>
-                      <span className="symbol">{stock.symbol}</span>
-                      <span className="price">${stock.price}</span>
-                      <span className={`change ${stock.change.startsWith('-') ? 'negative' : 'positive'}`}>
-                        {stock.change}
-                      </span>
-                      <span className="volume">Vol: {parseInt(stock.volume).toLocaleString()}</span>
-                    </>
-                  )}
+                  <span className="symbol">{stock.symbol}</span>
+                  <span className="price">${stock.price}</span>
+                  <span className={`change ${stock.change?.startsWith('-') ? 'negative' : 'positive'}`}>
+                    {stock.change}
+                  </span>
+                  <span className="volume">Vol: {parseInt(stock.volume || 0).toLocaleString()}</span>
+                  {!stock.realData && <span className="mock-data-tag">mock</span>}
                 </div>
               ))}
             </div>
@@ -222,9 +213,9 @@ export default function Dashboard() {
               className="stock-selector"
             >
               <option value="AAPL">Apple (AAPL)</option>
-              <option value="GOOGL">Google (GOOGL)</option>
-              <option value="MSFT">Microsoft (MSFT)</option>
-              <option value="AMZN">Amazon (AMZN)</option>
+              <option value="TSLA">Tesla (TSLA)</option>
+              <option value="BRK.B">Berkshire Hathaway (BRK.B)</option>
+              <option value="SCT.L">Softcat plc (SCT.L)</option>
             </select>
           </div>
           
@@ -237,7 +228,14 @@ export default function Dashboard() {
             ) : chartError ? (
               <div className="error-message">{chartError}</div>
             ) : stockChartData ? (
-              <Line data={stockChartData} options={chartOptions} />
+              <>
+                <Line data={stockChartData} options={chartOptions} />
+                {stockChartData.datasets[0].label.includes('Mock') && (
+                  <div className="data-notice">
+                    <span className="warning-icon">⚠️</span> Showing simulated data due to API limitations
+                  </div>
+                )}
+              </>
             ) : (
               <div className="error-message">No data available</div>
             )}
