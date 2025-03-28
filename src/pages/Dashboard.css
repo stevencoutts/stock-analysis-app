@@ -58,10 +58,12 @@
 
 .chart-card {
   grid-column: 1 / -1;
+  min-height: 500px;
 }
 
 .chart-container {
   height: 400px;
+  position: relative;
   margin-top: 20px;
 }
 
@@ -123,11 +125,17 @@
 }
 
 .stock-selector {
-  padding: 8px;
-  border-radius: 5px;
+  padding: 8px 12px;
   border: 1px solid #ddd;
-  margin-top: 10px;
-  width: 200px;
+  border-radius: 4px;
+  background-color: white;
+  font-size: 14px;
+  cursor: pointer;
+  min-width: 150px;
+}
+
+.stock-selector:hover {
+  border-color: #aaa;
 }
 
 .card-header {
@@ -150,6 +158,39 @@
   color: #dc3545;
   grid-column: 2 / -1;
   text-align: center;
+}
+
+.loading-spinner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: #666;
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  margin-bottom: 10px;
+  border: 4px solid #f3f3f3;
+  border-top: 4px solid #3498db;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.error-message {
+  color: #dc3545;
+  text-align: center;
+  padding: 20px;
+  background: #fff3f3;
+  border-radius: 4px;
+  margin: 20px 0;
 }
 
 /* Responsive Design */

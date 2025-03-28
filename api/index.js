@@ -91,6 +91,57 @@ app.get('/api/market-overview', async (req, res) => {
   }
 });
 
+// Stock Performance endpoint with better error handling and logging
+app.get('/api/stock-performance/:symbol', async (req, res) => {
+  try {
+    const { symbol } = req.params;
+    console.log(`Fetching data for ${symbol}`);
+
+    const response = await axios.get(
+      `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${symbol}&apikey=${ALPHA_VANTAGE_API_KEY}&outputsize=compact`
+    );
+
+    console.log('API Response received:', Object.keys(response.data));
+
+    if (!response.data['Time Series (Daily)']) {
+      console.error('No time series data in response:', response.data);
+      throw new Error(`No data available for ${symbol}`);
+    }
+
+    const timeSeriesData = response.data['Time Series (Daily)'];
+    const formattedData = Object.entries(timeSeriesData)
+      .slice(0, 30) // Last 30 days
+      .reverse()
+      .map(([date, values]) => ({
+        date: new Date(date).toLocaleDateString(),
+        price: parseFloat(values['4. close'])
+      }));
+
+    console.log('Formatted data:', formattedData[0]); // Log first data point
+
+    const chartData = {
+      labels: formattedData.map(item => item.date),
+      datasets: [{
+        label: `${symbol} Stock Price`,
+        data: formattedData.map(item => item.price),
+        borderColor: 'rgb(75, 192, 192)',
+        backgroundColor: 'rgba(75, 192, 192, 0.2)',
+        borderWidth: 2,
+        fill: true,
+        tension: 0.1
+      }]
+    };
+
+    res.json(chartData);
+  } catch (error) {
+    console.error(`Error fetching stock data for ${req.params.symbol}:`, error);
+    res.status(500).json({ 
+      error: 'Failed to fetch stock data',
+      details: error.message 
+    });
+  }
+});
+
 app.listen(port, () => {
   console.log(`Server is running on port ${port}`);
 }); 

@@ -8,7 +8,8 @@ import {
   LineElement,
   Title,
   Tooltip,
-  Legend
+  Legend,
+  Filler
 } from 'chart.js';
 import { useAuth } from '../contexts/AuthContext';
 import axios from 'axios';
@@ -22,7 +23,8 @@ ChartJS.register(
   LineElement,
   Title,
   Tooltip,
-  Legend
+  Legend,
+  Filler
 );
 
 export default function Dashboard() {
@@ -34,6 +36,9 @@ export default function Dashboard() {
   const [lastUpdated, setLastUpdated] = useState(null);
   const [error, setError] = useState('');
   const [warning, setWarning] = useState('');
+  const [stockChartData, setStockChartData] = useState(null);
+  const [chartLoading, setChartLoading] = useState(true);
+  const [chartError, setChartError] = useState('');
 
   // Sample data - replace with actual API calls
   const mockStockData = {
@@ -70,6 +75,35 @@ export default function Dashboard() {
     return () => clearInterval(interval);
   }, []);
 
+  useEffect(() => {
+    const fetchStockData = async () => {
+      try {
+        setChartLoading(true);
+        setChartError('');
+        console.log('Fetching data for:', selectedStock);
+        
+        const response = await axios.get(`http://localhost:8081/api/stock-performance/${selectedStock}`);
+        console.log('Received chart data:', response.data);
+        
+        if (response.data.error) {
+          throw new Error(response.data.error);
+        }
+        
+        setStockChartData(response.data);
+      } catch (err) {
+        console.error('Chart error:', err);
+        setChartError(err.message || 'Failed to fetch stock performance data');
+      } finally {
+        setChartLoading(false);
+      }
+    };
+
+    fetchStockData();
+    const interval = setInterval(fetchStockData, 300000); // 5 minutes
+
+    return () => clearInterval(interval);
+  }, [selectedStock]);
+
   const formatLastUpdated = (date) => {
     if (!date) return '';
     const now = new Date();
@@ -79,6 +113,52 @@ export default function Dashboard() {
     if (diff < 3600) return `${Math.floor(diff / 60)} minutes ago`;
     if (diff < 86400) return `${Math.floor(diff / 3600)} hours ago`;
     return date.toLocaleDateString();
+  };
+
+  const chartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        position: 'top',
+      },
+      title: {
+        display: true,
+        text: `${selectedStock} Stock Performance (Last 30 Days)`,
+        font: {
+          size: 16
+        }
+      },
+      tooltip: {
+        mode: 'index',
+        intersect: false,
+        callbacks: {
+          label: function(context) {
+            return `$${context.parsed.y.toFixed(2)}`;
+          }
+        }
+      }
+    },
+    scales: {
+      x: {
+        grid: {
+          display: false
+        }
+      },
+      y: {
+        beginAtZero: false,
+        ticks: {
+          callback: function(value) {
+            return '$' + value.toFixed(2);
+          }
+        }
+      }
+    },
+    interaction: {
+      mode: 'nearest',
+      axis: 'x',
+      intersect: false
+    }
   };
 
   return (
@@ -134,31 +214,33 @@ export default function Dashboard() {
 
         {/* Stock Chart Card */}
         <div className="dashboard-card chart-card">
-          <h2>Stock Performance</h2>
-          <select 
-            value={selectedStock}
-            onChange={(e) => setSelectedStock(e.target.value)}
-            className="stock-selector"
-          >
-            <option value="AAPL">Apple (AAPL)</option>
-            <option value="GOOGL">Google (GOOGL)</option>
-            <option value="MSFT">Microsoft (MSFT)</option>
-            <option value="AMZN">Amazon (AMZN)</option>
-          </select>
+          <div className="card-header">
+            <h2>Stock Performance</h2>
+            <select 
+              value={selectedStock}
+              onChange={(e) => setSelectedStock(e.target.value)}
+              className="stock-selector"
+            >
+              <option value="AAPL">Apple (AAPL)</option>
+              <option value="GOOGL">Google (GOOGL)</option>
+              <option value="MSFT">Microsoft (MSFT)</option>
+              <option value="AMZN">Amazon (AMZN)</option>
+            </select>
+          </div>
+          
           <div className="chart-container">
-            <Line data={mockStockData} options={{
-              responsive: true,
-              maintainAspectRatio: false,
-              plugins: {
-                legend: {
-                  position: 'top',
-                },
-                title: {
-                  display: true,
-                  text: `${selectedStock} Stock Price`
-                }
-              }
-            }} />
+            {chartLoading ? (
+              <div className="loading-spinner">
+                <div className="spinner"></div>
+                Loading chart data...
+              </div>
+            ) : chartError ? (
+              <div className="error-message">{chartError}</div>
+            ) : stockChartData ? (
+              <Line data={stockChartData} options={chartOptions} />
+            ) : (
+              <div className="error-message">No data available</div>
+            )}
           </div>
         </div>
 
