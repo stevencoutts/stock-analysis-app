@@ -28,6 +28,7 @@ cd stock-analysis-app
 2. Install dependencies:
 ```bash
 npm install
+npm install chart.js react-chartjs-2
 ```
 
 3. Build and run with Docker:

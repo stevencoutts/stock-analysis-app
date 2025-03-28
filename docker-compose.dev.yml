@@ -1,0 +1,32 @@
+services:
+  frontend:
+    container_name: stock-frontend-dev
+    build:
+      target: build
+    volumes:
+      - ./:/app
+      - /app/node_modules
+    ports:
+      - "8082:3000"
+    environment:
+      - NODE_ENV=development
+      - CHOKIDAR_USEPOLLING=true
+      - REACT_APP_API_URL=http://localhost:8081
+    command: npm start
+
+  api:
+    container_name: stock-api-dev
+    volumes:
+      - ./api:/app
+      - /app/node_modules
+    ports:
+      - "8081:5000"
+    environment:
+      - NODE_ENV=development
+
+  db:
+    container_name: stock-db-dev
+    ports:
+      - "5432:5432"
+
+  # Add any other development services here (e.g., backend, database) 
