@@ -1,39 +1,22 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
-import './App.css';
-
-// Temporary simple components for testing
-const Dashboard = () => <div>Dashboard Page</div>;
-const Analysis = () => <div>Analysis Page</div>;
-const Watchlists = () => <div>Watchlists Page</div>;
-const Profile = () => <div>Profile Page</div>;
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { AuthProvider } from './contexts/AuthContext';
+import Dashboard from './pages/Dashboard';
+import Login from './pages/Login';
+import UserManagement from './pages/UserManagement';
 
 function App() {
   return (
     <Router>
-      <div className="app">
-        <nav className="navbar">
-          <div className="nav-brand">
-            <Link to="/">Stock Analysis</Link>
-          </div>
-          <div className="nav-links">
-            <Link to="/dashboard">Dashboard</Link>
-            <Link to="/analysis">Analysis</Link>
-            <Link to="/watchlists">Watchlists</Link>
-            <Link to="/profile">Profile</Link>
-          </div>
-        </nav>
-
-        <main className="content">
-          <Routes>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/analysis" element={<Analysis />} />
-            <Route path="/watchlists" element={<Watchlists />} />
-            <Route path="/profile" element={<Profile />} />
-          </Routes>
-        </main>
-      </div>
+      <AuthProvider>
+        <Routes>
+          <Route path="/login" element={<Login />} />
+          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/admin/users" element={<UserManagement />} />
+          <Route path="/" element={<Navigate to="/dashboard" />} />
+          <Route path="*" element={<Navigate to="/dashboard" />} />
+        </Routes>
+      </AuthProvider>
     </Router>
   );
 }

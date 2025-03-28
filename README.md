@@ -1,107 +1,136 @@
-# Stock Analysis App
+# Stock Analysis Application
 
-A modern web application for analyzing stocks, managing watchlists, and tracking market performance. Built with React and Docker.
+A full-stack application for analyzing stock market data with user management capabilities.
 
 ## Features
 
-- 📊 Real-time stock price monitoring
-- 📈 Technical analysis tools
-- 📱 Responsive design
-- 👥 User authentication
-- 📋 Customizable watchlists
-- 📊 Market overview dashboard
+- Real-time stock market data visualization
+- User authentication and authorization
+- Admin dashboard for user management
+- Interactive stock performance charts
+- Market overview with multiple stock symbols
+- Secure data storage and API integration
 
 ## Tech Stack
 
 - Frontend: React.js
-- Routing: React Router
-- Styling: CSS3
-- Containerization: Docker
+- Backend: Node.js with Express
 - Database: PostgreSQL
-- API: Node.js/Express
+- Authentication: JWT
+- Containerization: Docker
+- Stock Data: Alpha Vantage API
 
-## Getting Started
+## Prerequisites
 
-### Prerequisites
-
-- Node.js (v14 or higher)
 - Docker and Docker Compose
-- npm or yarn
+- Node.js (for local development)
+- Alpha Vantage API key
 
-### Installation
+## Environment Setup
+
+1. Create a `.env` file in the root directory:
+
+```env
+# Frontend Configuration
+REACT_APP_API_URL=http://localhost:8081
+
+# API Configuration
+API_PORT=8081
+JWT_SECRET=your_secure_jwt_secret_key
+
+# Database Configuration
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=mysecretpassword
+POSTGRES_DB=stockdb
+DB_PORT=5432
+
+# Alpha Vantage API
+ALPHA_VANTAGE_API_KEY=your_api_key
+```
+
+## Installation & Running
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/yourusername/stock-analysis-app.git
+git clone <repository-url>
 cd stock-analysis-app
 ```
 
-2. Install dependencies:
-```bash
-npm install
-```
-
-3. Start the development server:
-```bash
-npm start
-```
-
-### Docker Setup
-
-1. Build and run with Docker Compose:
+2. Build and start the containers:
 ```bash
 docker-compose up --build
 ```
 
-2. Access the application:
-- Frontend: http://localhost:3000
-- API: http://localhost:5010
+3. Access the application:
+- Frontend: http://localhost:8082
+- API: http://localhost:8081
 
-## Project Structure
+## Default Credentials
 
-## User Roles
-
-### Regular User
-- View stock data and perform analysis
-- Create and manage personal watchlists
-- Update personal profile
-
-### Admin User
-- All regular user capabilities
-- Manage users (create, update, delete)
-- Access admin dashboard with system-wide statistics
-
-## Default Admin Account
-
-On first run, a default admin account is created:
-
-- Email: admin@example.com
-- Password: admin123
-
-**Important**: Change these credentials immediately after first login.
+- Admin User:
+  - Email: admin@example.com
+  - Password: admin123
 
 ## Development
 
-### Running in Development Mode
-
+For development with hot-reloading:
 ```bash
-docker-compose -f docker-compose.yml -f docker-compose.dev.yml up
+docker-compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 ```
 
-This starts the application with volume mounts for live code reloading.
+## API Endpoints
 
-### Database Migrations
+### Authentication
+- POST /api/auth/login - User login
 
-The application uses Sequelize to manage database schema. The models are automatically synchronized on startup.
+### User Management (Admin only)
+- GET /api/users - List all users
+- POST /api/users - Create new user
+- PUT /api/users/:id - Update user
+- DELETE /api/users/:id - Delete user
+- GET /api/users/:id/activity - Get user activity
+
+### Stock Data
+- GET /api/market-overview - Get market overview
+- GET /api/stock-performance/:symbol - Get stock performance data
+
+## Security Features
+
+- JWT-based authentication
+- Password hashing with bcrypt
+- Role-based access control
+- Activity logging
+- Session management
+- Rate limiting for API calls
+
+## Database Schema
+
+### Users Table
+- id (Primary Key)
+- name
+- email (Unique)
+- password (Hashed)
+- role
+- status
+- last_login
+- created_at
+- updated_at
+
+### User Activity Log
+- id (Primary Key)
+- user_id (Foreign Key)
+- action
+- details
+- created_at
+
+## Contributing
+
+1. Fork the repository
+2. Create your feature branch
+3. Commit your changes
+4. Push to the branch
+5. Create a new Pull Request
 
 ## License
 
-[The Unlicense](LICENSE)
-
-## Acknowledgments
-
-- [React](https://reactjs.org/)
-- [Material UI](https://mui.com/)
-- [Express](https://expressjs.com/)
-- [Sequelize](https://sequelize.org/)
-- [Chart.js](https://www.chartjs.org/) 
+[Your License] 
