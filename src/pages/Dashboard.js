@@ -11,6 +11,7 @@ import {
   Legend
 } from 'chart.js';
 import { useAuth } from '../contexts/AuthContext';
+import axios from 'axios';
 import './Dashboard.css';
 
 // Register ChartJS components
@@ -29,6 +30,10 @@ export default function Dashboard() {
   const [selectedStock, setSelectedStock] = useState('AAPL');
   const [stockData, setStockData] = useState({});
   const [loading, setLoading] = useState(true);
+  const [marketData, setMarketData] = useState([]);
+  const [lastUpdated, setLastUpdated] = useState(null);
+  const [error, setError] = useState('');
+  const [warning, setWarning] = useState('');
 
   // Sample data - replace with actual API calls
   const mockStockData = {
@@ -41,17 +46,40 @@ export default function Dashboard() {
     }]
   };
 
-  const marketSummary = [
-    { symbol: 'AAPL', price: '150.23', change: '+2.5%' },
-    { symbol: 'GOOGL', price: '2,800.75', change: '-0.8%' },
-    { symbol: 'MSFT', price: '290.50', change: '+1.2%' },
-    { symbol: 'AMZN', price: '3,400.25', change: '+0.5%' }
-  ];
-
   useEffect(() => {
-    // Simulate loading
-    setTimeout(() => setLoading(false), 1000);
+    const fetchMarketData = async () => {
+      try {
+        setLoading(true);
+        const response = await axios.get('http://localhost:8081/api/market-overview');
+        setMarketData(response.data.data);
+        setLastUpdated(new Date(response.data.lastUpdated));
+        setWarning(response.data.warning || '');
+        setError('');
+      } catch (err) {
+        setError('Failed to fetch market data');
+        console.error('Error:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchMarketData();
+    // Refresh data every minute
+    const interval = setInterval(fetchMarketData, 60000);
+
+    return () => clearInterval(interval);
   }, []);
+
+  const formatLastUpdated = (date) => {
+    if (!date) return '';
+    const now = new Date();
+    const diff = Math.floor((now - date) / 1000); // difference in seconds
+
+    if (diff < 60) return 'Just now';
+    if (diff < 3600) return `${Math.floor(diff / 60)} minutes ago`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)} hours ago`;
+    return date.toLocaleDateString();
+  };
 
   return (
     <div className="dashboard-container">
@@ -65,18 +93,43 @@ export default function Dashboard() {
       <div className="dashboard-grid">
         {/* Market Overview Card */}
         <div className="dashboard-card market-overview">
-          <h2>Market Overview</h2>
-          <div className="market-summary">
-            {marketSummary.map((stock) => (
-              <div key={stock.symbol} className="market-item">
-                <span className="symbol">{stock.symbol}</span>
-                <span className="price">${stock.price}</span>
-                <span className={`change ${stock.change.startsWith('+') ? 'positive' : 'negative'}`}>
-                  {stock.change}
-                </span>
+          <div className="card-header">
+            <h2>Market Overview</h2>
+            {lastUpdated && (
+              <div className="last-updated">
+                Last updated: {formatLastUpdated(lastUpdated)}
+                {warning && <span className="warning-text"> ({warning})</span>}
               </div>
-            ))}
+            )}
           </div>
+          
+          {loading && !marketData.length ? (
+            <div className="loading-spinner">Loading market data...</div>
+          ) : error ? (
+            <div className="error-message">{error}</div>
+          ) : (
+            <div className="market-summary">
+              {marketData.map((stock) => (
+                <div key={stock.symbol} className="market-item">
+                  {stock.error ? (
+                    <>
+                      <span className="symbol">{stock.symbol}</span>
+                      <span className="error-text">{stock.error}</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="symbol">{stock.symbol}</span>
+                      <span className="price">${stock.price}</span>
+                      <span className={`change ${stock.change.startsWith('-') ? 'negative' : 'positive'}`}>
+                        {stock.change}
+                      </span>
+                      <span className="volume">Vol: {parseInt(stock.volume).toLocaleString()}</span>
+                    </>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Stock Chart Card */}

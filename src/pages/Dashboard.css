@@ -42,11 +42,18 @@
 }
 
 .market-item {
-  display: flex;
-  justify-content: space-between;
-  padding: 10px;
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr 1fr;
+  gap: 10px;
+  padding: 15px;
   background: #f8f9fa;
   border-radius: 5px;
+  align-items: center;
+  transition: background-color 0.3s ease;
+}
+
+.market-item:hover {
+  background: #e9ecef;
 }
 
 .chart-card {
@@ -121,6 +128,28 @@
   border: 1px solid #ddd;
   margin-top: 10px;
   width: 200px;
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.last-updated {
+  font-size: 0.9em;
+  color: #666;
+}
+
+.warning-text {
+  color: #f0ad4e;
+}
+
+.error-text {
+  color: #dc3545;
+  grid-column: 2 / -1;
+  text-align: center;
 }
 
 /* Responsive Design */
