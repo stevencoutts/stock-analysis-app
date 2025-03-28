@@ -45,7 +45,6 @@ export default function Dashboard() {
       setLastFetched(prev => ({ ...prev, market: new Date() }));
       setError('');
     } catch (err) {
-      console.error('Error fetching market data:', err);
       setError('Failed to fetch market data');
     }
   }, []);

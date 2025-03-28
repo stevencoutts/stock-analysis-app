@@ -1,117 +1,136 @@
 # Stock Analysis Application
 
-A web-based application for analyzing stock market data and trends, built with React and Docker.
+A full-stack application for analyzing stock market data with user management capabilities.
 
 ## Features
 
-- User authentication system
-- Interactive stock data visualization
-- Real-time market data analysis
-- Responsive dashboard interface
-- Secure API integration
+- Real-time stock market data visualization
+- User authentication and authorization
+- Admin dashboard for user management
+- Interactive stock performance charts
+- Market overview with multiple stock symbols
+- Secure data storage and API integration
+
+## Tech Stack
+
+- Frontend: React.js
+- Backend: Node.js with Express
+- Database: PostgreSQL
+- Authentication: JWT
+- Containerization: Docker
+- Stock Data: Alpha Vantage API
 
 ## Prerequisites
 
-Before you begin, ensure you have installed:
-- [Node.js](https://nodejs.org/) (v18 or higher)
-- [Docker](https://www.docker.com/get-started)
-- [Docker Compose](https://docs.docker.com/compose/install/)
+- Docker and Docker Compose
+- Node.js (for local development)
+- Alpha Vantage API key
 
-## Installation
+## Environment Setup
+
+1. Create a `.env` file in the root directory:
+
+```env
+# Frontend Configuration
+REACT_APP_API_URL=http://localhost:8081
+
+# API Configuration
+API_PORT=8081
+JWT_SECRET=your_secure_jwt_secret_key
+
+# Database Configuration
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=mysecretpassword
+POSTGRES_DB=stockdb
+DB_PORT=5432
+
+# Alpha Vantage API
+ALPHA_VANTAGE_API_KEY=your_api_key
+```
+
+## Installation & Running
 
 1. Clone the repository:
 ```bash
-git clone <your-repository-url>
+git clone <repository-url>
 cd stock-analysis-app
 ```
 
-2. Install dependencies:
+2. Build and start the containers:
 ```bash
-npm install
-npm install chart.js react-chartjs-2
+docker-compose up --build
 ```
 
-3. Build and run with Docker:
-```bash
-docker-compose up -d --build
-```
+3. Access the application:
+- Frontend: http://localhost:8082
+- API: http://localhost:8081
 
-The application will be available at `http://localhost:3000`
+## Default Credentials
+
+- Admin User:
+  - Email: admin@example.com
+  - Password: admin123
 
 ## Development
 
-To run the application in development mode:
-
+For development with hot-reloading:
 ```bash
-npm start
+docker-compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 ```
 
-To build for production:
+## API Endpoints
 
-```bash
-npm run build
-```
+### Authentication
+- POST /api/auth/login - User login
 
-## Docker Configuration
+### User Management (Admin only)
+- GET /api/users - List all users
+- POST /api/users - Create new user
+- PUT /api/users/:id - Update user
+- DELETE /api/users/:id - Delete user
+- GET /api/users/:id/activity - Get user activity
 
-The application uses a multi-stage Docker build process:
-- Build stage: Node.js environment for building the React application
-- Production stage: Nginx server for serving the static files
+### Stock Data
+- GET /api/market-overview - Get market overview
+- GET /api/stock-performance/:symbol - Get stock performance data
 
-## Project Structure
+## Security Features
 
-## User Roles
+- JWT-based authentication
+- Password hashing with bcrypt
+- Role-based access control
+- Activity logging
+- Session management
+- Rate limiting for API calls
 
-### Regular User
-- View stock data and perform analysis
-- Create and manage personal watchlists
-- Update personal profile
+## Database Schema
 
-### Admin User
-- All regular user capabilities
-- Manage users (create, update, delete)
-- Access admin dashboard with system-wide statistics
+### Users Table
+- id (Primary Key)
+- name
+- email (Unique)
+- password (Hashed)
+- role
+- status
+- last_login
+- created_at
+- updated_at
 
-## Default Admin Account
+### User Activity Log
+- id (Primary Key)
+- user_id (Foreign Key)
+- action
+- details
+- created_at
 
-On first run, a default admin account is created:
+## Contributing
 
-- Email: admin@example.com
-- Password: admin123
-
-**Important**: Change these credentials immediately after first login.
-
-## Development
-
-### Running in Development Mode
-
-```bash
-docker-compose -f docker-compose.yml -f docker-compose.dev.yml up
-```
-
-This starts the application with volume mounts for live code reloading.
-
-### Database Migrations
-
-The application uses Sequelize to manage database schema. The models are automatically synchronized on startup.
+1. Fork the repository
+2. Create your feature branch
+3. Commit your changes
+4. Push to the branch
+5. Create a new Pull Request
 
 ## License
 
-[The Unlicense](LICENSE)
-
-## Acknowledgments
-
-- [React](https://reactjs.org/)
-- [Material UI](https://mui.com/)
-- [Express](https://expressjs.com/)
-- [Sequelize](https://sequelize.org/)
-- [Chart.js](https://www.chartjs.org/)
-
-# Environment Variables
-
-This project uses environment variables for configuration. Before running the application, make sure to:
-
-1. Create a `.env` file in the root directory for frontend variables
-2. Create an `api/.env` file for API service variables
-
-You can use the provided `.env.example` and `api/.env.example` files as templates. 
+[Your License] 

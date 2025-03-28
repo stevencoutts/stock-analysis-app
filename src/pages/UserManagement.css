@@ -5,10 +5,31 @@
 }
 
 .admin-header {
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  padding: 20px;
+  margin-bottom: 20px;
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
+  align-items: flex-start;
+}
+
+.header-content {
+  display: flex;
+  flex-direction: column;
+}
+
+.header-content h1 {
+  margin: 0;
+  color: #333;
+  font-size: 1.8rem;
+}
+
+.header-subtitle {
+  color: #666;
+  font-size: 0.9rem;
+  margin-top: 5px;
 }
 
 .add-user-button {
@@ -17,12 +38,17 @@
   border: none;
   border-radius: 4px;
   padding: 10px 20px;
-  cursor: pointer;
   font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.add-user-button:hover {
+  background-color: #218838;
 }
 
 .users-table-container {
-  background: white;
+  background-color: white;
   border-radius: 8px;
   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
   overflow: hidden;
@@ -46,8 +72,8 @@
   color: #495057;
 }
 
-.users-table tr:last-child td {
-  border-bottom: none;
+.users-table tr:hover {
+  background-color: #f8f9fa;
 }
 
 .inactive-user {
@@ -96,6 +122,7 @@
   border-radius: 4px;
   cursor: pointer;
   font-size: 12px;
+  transition: background-color 0.2s;
 }
 
 .edit-button {
@@ -103,19 +130,26 @@
   color: white;
 }
 
-.status-button.activate {
-  background-color: #28a745;
+.edit-button:hover {
+  background-color: #138496;
+}
+
+.activity-button {
+  background-color: #6c757d;
   color: white;
 }
 
-.status-button.deactivate {
-  background-color: #ffc107;
-  color: #212529;
+.activity-button:hover {
+  background-color: #5a6268;
 }
 
 .delete-button {
   background-color: #dc3545;
   color: white;
+}
+
+.delete-button:hover {
+  background-color: #c82333;
 }
 
 .modal-overlay {
@@ -134,14 +168,17 @@
 .modal {
   background-color: white;
   border-radius: 8px;
-  padding: 20px;
-  width: 400px;
+  padding: 25px;
+  width: 500px;
   max-width: 90%;
+  max-height: 90vh;
+  overflow-y: auto;
 }
 
 .modal h2 {
   margin-top: 0;
   margin-bottom: 20px;
+  color: #333;
 }
 
 .form-group {
@@ -152,15 +189,23 @@
   display: block;
   margin-bottom: 5px;
   font-weight: 500;
+  color: #495057;
 }
 
 .form-group input,
 .form-group select {
   width: 100%;
-  padding: 8px;
+  padding: 8px 12px;
   border: 1px solid #ddd;
   border-radius: 4px;
   font-size: 14px;
+}
+
+.form-group input:focus,
+.form-group select:focus {
+  border-color: #80bdff;
+  outline: 0;
+  box-shadow: 0 0 0 0.2rem rgba(0,123,255,.25);
 }
 
 .modal-buttons {
@@ -179,6 +224,10 @@
   cursor: pointer;
 }
 
+.submit-button:hover {
+  background-color: #0056b3;
+}
+
 .cancel-button {
   background-color: #6c757d;
   color: white;
@@ -186,6 +235,44 @@
   padding: 8px 16px;
   border-radius: 4px;
   cursor: pointer;
+}
+
+.cancel-button:hover {
+  background-color: #5a6268;
+}
+
+.activity-modal {
+  width: 600px;
+}
+
+.activity-list {
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.activity-item {
+  padding: 10px;
+  border-bottom: 1px solid #eee;
+}
+
+.activity-action {
+  font-weight: 500;
+  color: #333;
+}
+
+.activity-time {
+  font-size: 0.8rem;
+  color: #666;
+  margin-top: 2px;
+}
+
+.activity-details {
+  margin-top: 5px;
+  font-size: 0.9rem;
+  color: #495057;
+  background-color: #f8f9fa;
+  padding: 5px;
+  border-radius: 4px;
 }
 
 .error-message,
@@ -205,4 +292,32 @@
   background-color: #d4edda;
   color: #155724;
   border: 1px solid #c3e6cb;
+}
+
+.loading-spinner {
+  text-align: center;
+  padding: 20px;
+  color: #666;
+}
+
+.header-navigation {
+  margin-bottom: 10px;
+}
+
+.back-link {
+  color: #4a90e2;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  font-weight: 500;
+  transition: color 0.2s;
+}
+
+.back-link:hover {
+  color: #357abd;
+}
+
+.back-arrow {
+  margin-right: 5px;
+  font-size: 1.2em;
 } 

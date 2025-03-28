@@ -19,9 +19,7 @@ export function AuthProvider({ children }) {
       try {
         const token = localStorage.getItem('token');
         if (token) {
-          // Set axios default header
-          axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-          
+          setAuthToken(token);
           // For demo purposes, use simulated users if token exists
           const simulatedUsers = {
             'admin@example.com': { 
@@ -65,41 +63,35 @@ export function AuthProvider({ children }) {
     loadUser();
   }, []);
 
+  const setAuthToken = (token) => {
+    if (token) {
+      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+    } else {
+      delete axios.defaults.headers.common['Authorization'];
+    }
+  };
+
   async function login(email, password) {
     try {
       setLoading(true);
       setError('');
       
-      // For demo purposes, use hardcoded credentials
-      if ((email === 'admin@example.com' && password === 'admin123') || 
-          (email === 'user@example.com' && password === 'user123')) {
-        
-        const isAdmin = email === 'admin@example.com';
-        const user = {
-          id: isAdmin ? '1' : '2',
-          email,
-          role: isAdmin ? 'admin' : 'user',
-          name: isAdmin ? 'Admin User' : 'Regular User'
-        };
-        
-        // Save to state
-        setCurrentUser(user);
-        
-        // Save to localStorage (simulating token)
-        const demoToken = 'demo-token-' + Math.random().toString(36).substring(2);
-        localStorage.setItem('token', demoToken);
-        localStorage.setItem('userEmail', email);
-        
-        // Set axios default header
-        axios.defaults.headers.common['Authorization'] = `Bearer ${demoToken}`;
-        
-        return { success: true, user };
-      }
+      const response = await axios.post('http://localhost:8081/api/auth/login', {
+        email,
+        password
+      });
       
-      throw new Error('Invalid email or password');
+      if (response.data.token) {
+        setCurrentUser(response.data.user);
+        localStorage.setItem('token', response.data.token);
+        setAuthToken(response.data.token);
+        return response.data;
+      } else {
+        throw new Error('No token received');
+      }
     } catch (err) {
-      setError(err.message || 'Failed to login');
-      return { success: false, error: err.message };
+      setError(err.response?.data?.error || 'Failed to login');
+      throw err;
     } finally {
       setLoading(false);
     }

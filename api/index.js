@@ -5,6 +5,9 @@ const cors = require('cors');
 const axios = require('axios');
 const fs = require('fs');
 const path = require('path');
+const jwt = require('jsonwebtoken');
+const { initializeDatabase } = require('./db/init');
+const userService = require('./services/userService');
 
 const app = express();
 const port = process.env.PORT || 5000;
@@ -68,19 +71,103 @@ const mockMarketData = {
   'SCT.L': { price: '1456.00', change: '+0.76%', volume: '124300' }
 };
 
+// Middleware
 app.use(cors());
 app.use(express.json());
 
-app.get('/', (req, res) => {
-  res.json({ message: 'Stock Analysis API is running' });
+// Initialize database
+initializeDatabase().catch(err => {
+  console.error('Failed to initialize database:', err);
+  process.exit(1);
 });
 
-// Add a test route
-app.get('/test', (req, res) => {
-  res.json({ message: 'API test endpoint working' });
+// Authentication middleware
+const authenticateToken = (req, res, next) => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+  
+  if (!token) {
+    return res.status(401).json({ error: 'Access token is required' });
+  }
+  
+  jwt.verify(token, process.env.JWT_SECRET || 'your_jwt_secret_key', (err, user) => {
+    if (err) {
+      return res.status(403).json({ error: 'Invalid or expired token' });
+    }
+    req.user = user;
+    next();
+  });
+};
+
+// Admin middleware
+const requireAdmin = (req, res, next) => {
+  if (!req.user || req.user.role !== 'admin') {
+    return res.status(403).json({ error: 'Admin access required' });
+  }
+  next();
+};
+
+// Auth routes
+app.post('/api/auth/login', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    const ipAddress = req.ip;
+    const userAgent = req.headers['user-agent'];
+    
+    const result = await userService.authenticate(email, password, ipAddress, userAgent);
+    res.json(result);
+  } catch (error) {
+    res.status(401).json({ error: error.message });
+  }
 });
 
-// Market Overview endpoint
+// User management routes
+app.get('/api/users', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const users = await userService.getAllUsers();
+    res.json(users);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/users', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const user = await userService.createUser(req.body);
+    res.status(201).json(user);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.put('/api/users/:id', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const user = await userService.updateUser(req.params.id, req.body);
+    res.json(user);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.delete('/api/users/:id', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    await userService.deleteUser(req.params.id);
+    res.json({ message: 'User deleted successfully' });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.get('/api/users/:id/activity', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const activity = await userService.getUserActivity(req.params.id);
+    res.json(activity);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// Market data routes (your existing routes)
 app.get('/api/market-overview', async (req, res) => {
   try {
     const symbols = ['AAPL', 'TSLA', 'BRK.B', 'SCT.L'];
@@ -505,6 +592,11 @@ app.get('/api/test-key', async (req, res) => {
       message: `Error testing API key: ${error.message}` 
     });
   }
+});
+
+// Default route
+app.get('/', (req, res) => {
+  res.json({ message: 'Stock Analysis API is running' });
 });
 
 app.listen(port, () => {

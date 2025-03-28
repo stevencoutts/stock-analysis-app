@@ -13,19 +13,15 @@ export default function Login() {
 
   async function handleSubmit(e) {
     e.preventDefault();
-    setError('');
-    setLoading(true);
-    
     try {
+      setError('');
+      setLoading(true);
       const result = await login(email, password);
       if (result.success) {
         navigate('/dashboard');
-      } else {
-        setError(result.error || 'Failed to sign in');
       }
     } catch (err) {
-      setError('Failed to sign in: ' + err.message);
-      console.error('Login error:', err);
+      setError(err.response?.data?.error || 'Failed to sign in');
     } finally {
       setLoading(false);
     }
@@ -60,11 +56,9 @@ export default function Login() {
           </button>
         </form>
         <div className="login-help">
-          <p>Demo credentials:</p>
-          <ul>
-            <li>Admin: admin@example.com / admin123</li>
-            <li>User: user@example.com / user123</li>
-          </ul>
+          <p>Default admin credentials:</p>
+          <p>Email: admin@example.com</p>
+          <p>Password: admin123</p>
         </div>
       </div>
     </div>
