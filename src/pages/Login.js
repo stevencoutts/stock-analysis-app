@@ -1,23 +1,41 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import './Login.css';
 
-const Login = () => {
+export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const navigate = useNavigate();
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
   const { login } = useAuth();
+  const navigate = useNavigate();
 
-  const handleSubmit = (e) => {
+  async function handleSubmit(e) {
     e.preventDefault();
-    login(email, password);
-    navigate('/dashboard');
-  };
+    setError('');
+    setLoading(true);
+    
+    try {
+      const result = await login(email, password);
+      if (result.success) {
+        navigate('/dashboard');
+      } else {
+        setError(result.error || 'Failed to sign in');
+      }
+    } catch (err) {
+      setError('Failed to sign in: ' + err.message);
+      console.error('Login error:', err);
+    } finally {
+      setLoading(false);
+    }
+  }
 
   return (
-    <div className="auth-container">
-      <div className="auth-card">
+    <div className="login-container">
+      <div className="login-card">
         <h2>Login</h2>
+        {error && <div className="error-alert">{error}</div>}
         <form onSubmit={handleSubmit}>
           <div className="form-group">
             <label>Email</label>
@@ -37,13 +55,18 @@ const Login = () => {
               required
             />
           </div>
-          <button type="submit" className="auth-button">
-            Login
+          <button disabled={loading} type="submit" className="login-button">
+            {loading ? 'Logging in...' : 'Login'}
           </button>
         </form>
+        <div className="login-help">
+          <p>Demo credentials:</p>
+          <ul>
+            <li>Admin: admin@example.com / admin123</li>
+            <li>User: user@example.com / user123</li>
+          </ul>
+        </div>
       </div>
     </div>
   );
-};
-
-export default Login; 
+} 
