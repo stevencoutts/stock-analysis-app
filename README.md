@@ -105,4 +105,13 @@ The application uses Sequelize to manage database schema. The models are automat
 - [Material UI](https://mui.com/)
 - [Express](https://expressjs.com/)
 - [Sequelize](https://sequelize.org/)
-- [Chart.js](https://www.chartjs.org/) 
+- [Chart.js](https://www.chartjs.org/)
+
+# Environment Variables
+
+This project uses environment variables for configuration. Before running the application, make sure to:
+
+1. Create a `.env` file in the root directory for frontend variables
+2. Create an `api/.env` file for API service variables
+
+You can use the provided `.env.example` and `api/.env.example` files as templates. 

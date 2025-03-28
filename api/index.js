@@ -1,3 +1,5 @@
+require('dotenv').config();
+
 const express = require('express');
 const cors = require('cors');
 const axios = require('axios');
@@ -7,6 +9,7 @@ const path = require('path');
 const app = express();
 const port = process.env.PORT || 5000;
 const ALPHA_VANTAGE_API_KEY = process.env.ALPHA_VANTAGE_API_KEY;
+const JWT_SECRET = process.env.JWT_SECRET;
 
 // Log API key configuration
 console.log('Alpha Vantage API Key configuration:');
