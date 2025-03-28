@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Line } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
@@ -39,6 +39,11 @@ export default function Dashboard() {
   const [stockChartData, setStockChartData] = useState(null);
   const [chartLoading, setChartLoading] = useState(true);
   const [chartError, setChartError] = useState('');
+  const [refreshing, setRefreshing] = useState(false);
+  const [lastFetched, setLastFetched] = useState({
+    market: null,
+    chart: null
+  });
 
   // Sample data - replace with actual API calls
   const mockStockData = {
@@ -51,68 +56,198 @@ export default function Dashboard() {
     }]
   };
 
-  useEffect(() => {
-    const fetchMarketData = async () => {
-      try {
-        setLoading(true);
-        const response = await axios.get('http://localhost:8081/api/market-overview');
-        setMarketData(response.data.data);
-        setLastUpdated(new Date(response.data.lastUpdated));
-        setWarning(response.data.warning || '');
-        setError('');
-      } catch (err) {
-        setError('Failed to fetch market data');
-        console.error('Error:', err);
-      } finally {
-        setLoading(false);
+  // Function to get cached data from localStorage
+  const getCachedData = (key) => {
+    try {
+      const cachedData = localStorage.getItem(key);
+      if (cachedData) {
+        return JSON.parse(cachedData);
       }
-    };
-
-    fetchMarketData();
-    // Refresh data every minute
-    const interval = setInterval(fetchMarketData, 60000);
-
-    return () => clearInterval(interval);
-  }, []);
-
-  useEffect(() => {
-    const fetchStockData = async () => {
-      try {
-        setChartLoading(true);
-        setChartError('');
-        console.log('Fetching data for:', selectedStock);
-        
-        const response = await axios.get(`http://localhost:8081/api/stock-performance/${selectedStock}`);
-        console.log('Received chart data:', response.data);
-        
-        if (response.data.error) {
-          throw new Error(response.data.error);
-        }
-        
-        setStockChartData(response.data);
-      } catch (err) {
-        console.error('Chart error:', err);
-        setChartError(err.message || 'Failed to fetch stock performance data');
-      } finally {
-        setChartLoading(false);
-      }
-    };
-
-    fetchStockData();
-    const interval = setInterval(fetchStockData, 300000); // 5 minutes
-
-    return () => clearInterval(interval);
-  }, [selectedStock]);
-
-  const formatLastUpdated = (date) => {
-    if (!date) return '';
+    } catch (e) {
+      console.error('Error reading from localStorage:', e);
+    }
+    return null;
+  };
+  
+  // Function to store data in localStorage
+  const setCachedData = (key, data) => {
+    try {
+      localStorage.setItem(key, JSON.stringify({
+        data,
+        timestamp: new Date().toISOString()
+      }));
+    } catch (e) {
+      console.error('Error writing to localStorage:', e);
+    }
+  };
+  
+  // Function to check if cached data is fresh enough
+  const isCacheFresh = (timestamp, maxAgeMinutes = 5) => {
+    if (!timestamp) return false;
+    
+    const cachedTime = new Date(timestamp);
     const now = new Date();
-    const diff = Math.floor((now - date) / 1000); // difference in seconds
+    const diffMs = now - cachedTime;
+    const diffMinutes = diffMs / (1000 * 60);
+    
+    return diffMinutes < maxAgeMinutes;
+  };
+  
+  // Intelligent function to determine if refresh is needed
+  const needsRefresh = (dataType) => {
+    const now = new Date();
+    const isWeekend = now.getDay() === 0 || now.getDay() === 6;
+    const hour = now.getHours();
+    const isMarketHours = hour >= 9 && hour < 16;
+    
+    // Cache longer outside market hours
+    const maxAge = isWeekend ? 720 : (isMarketHours ? 5 : 60);
+    
+    if (!lastFetched[dataType]) return true;
+    return !isCacheFresh(lastFetched[dataType], maxAge);
+  };
 
-    if (diff < 60) return 'Just now';
-    if (diff < 3600) return `${Math.floor(diff / 60)} minutes ago`;
-    if (diff < 86400) return `${Math.floor(diff / 3600)} hours ago`;
-    return date.toLocaleDateString();
+  // Define fetchMarketData as a useCallback to avoid recreation
+  const fetchMarketData = useCallback(async (forceRefresh = false) => {
+    try {
+      setLoading(true);
+      
+      // Check localStorage first if not forcing refresh
+      if (!forceRefresh) {
+        const cachedMarketData = getCachedData('marketData');
+        if (cachedMarketData && isCacheFresh(cachedMarketData.timestamp, 
+                                            needsRefresh('market') ? 5 : 60)) {
+          setMarketData(cachedMarketData.data.data);
+          setError('');
+          setLoading(false);
+          setLastFetched(prev => ({...prev, market: cachedMarketData.timestamp}));
+          return;
+        }
+      }
+      
+      // Fetch from API with refresh parameter
+      const response = await axios.get(`http://localhost:8081/api/market-overview${forceRefresh ? '?refresh=true' : ''}`);
+      setMarketData(response.data.data);
+      setError('');
+      
+      // Store in localStorage
+      setCachedData('marketData', response.data);
+      setLastFetched(prev => ({...prev, market: new Date().toISOString()}));
+    } catch (err) {
+      setError('Failed to fetch market data');
+      console.error('Error:', err);
+      
+      // Try to use cached data even if it's old
+      const cachedMarketData = getCachedData('marketData');
+      if (cachedMarketData) {
+        setMarketData(cachedMarketData.data.data);
+        setError('Using cached data due to fetch error');
+      }
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, [setMarketData, setError, setLoading, setLastFetched, setRefreshing]);
+
+  // Define fetchStockData as a useCallback
+  const fetchStockData = useCallback(async (forceRefresh = false) => {
+    try {
+      setChartLoading(true);
+      
+      // Check localStorage first if not forcing refresh
+      const cacheKey = `stockData-${selectedStock}`;
+      if (!forceRefresh) {
+        const cachedStockData = getCachedData(cacheKey);
+        if (cachedStockData && isCacheFresh(cachedStockData.timestamp,
+                                           needsRefresh('chart') ? 10 : 120)) {
+          setStockChartData(cachedStockData.data);
+          setChartError('');
+          setChartLoading(false);
+          setLastFetched(prev => ({...prev, chart: cachedStockData.timestamp}));
+          return;
+        }
+      }
+      
+      // Fetch from API with refresh parameter
+      const response = await axios.get(
+        `http://localhost:8081/api/stock-performance/${selectedStock}${forceRefresh ? '?refresh=true' : ''}`
+      );
+      setStockChartData(response.data);
+      setChartError('');
+      
+      // Store in localStorage
+      setCachedData(cacheKey, response.data);
+      setLastFetched(prev => ({...prev, chart: new Date().toISOString()}));
+    } catch (err) {
+      setChartError('Failed to fetch stock data');
+      console.error('Error:', err);
+      
+      // Try to use cached data even if it's old
+      const cacheKey = `stockData-${selectedStock}`;
+      const cachedStockData = getCachedData(cacheKey);
+      if (cachedStockData) {
+        setStockChartData(cachedStockData.data);
+        setChartError('Using cached data due to fetch error');
+      }
+    } finally {
+      setChartLoading(false);
+    }
+  }, [selectedStock, setStockChartData, setChartError, setChartLoading, setLastFetched]);
+
+  // Fetch market data on component mount
+  useEffect(() => {
+    fetchMarketData();
+    
+    // Set up an interval to check if we need to refresh
+    const interval = setInterval(() => {
+      if (needsRefresh('market')) {
+        fetchMarketData();
+      }
+    }, 60000); // Check every minute if refresh is needed
+    
+    return () => clearInterval(interval);
+  }, [fetchMarketData]);
+
+  // Fetch stock data when selected stock changes
+  useEffect(() => {
+    fetchStockData();
+    
+    // Check periodically if we need to refresh
+    const interval = setInterval(() => {
+      if (needsRefresh('chart')) {
+        fetchStockData();
+      }
+    }, 120000); // Check every 2 minutes
+    
+    return () => clearInterval(interval);
+  }, [selectedStock, fetchStockData]);
+
+  // Manual refresh function
+  const handleRefresh = () => {
+    setRefreshing(true);
+    Promise.all([
+      fetchMarketData(true),
+      fetchStockData(true)
+    ]).finally(() => {
+      setRefreshing(false);
+    });
+  };
+
+  // Format the last updated time
+  const formatLastUpdated = (timestamp) => {
+    if (!timestamp) return 'Never';
+    
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diffMs = now - date;
+    const diffMinutes = Math.floor(diffMs / (1000 * 60));
+    
+    if (diffMinutes < 1) return 'Just now';
+    if (diffMinutes < 60) return `${diffMinutes} minutes ago`;
+    
+    const hours = date.getHours();
+    const minutes = date.getMinutes();
+    return `${hours}:${minutes.toString().padStart(2, '0')}`;
   };
 
   const chartOptions = {
@@ -161,12 +296,60 @@ export default function Dashboard() {
     }
   };
 
+  // Update the checkApiStatus function
+  const checkApiStatus = async () => {
+    try {
+      setRefreshing(true);
+      console.log('Requesting API diagnosis...');
+      
+      const response = await axios.get('http://localhost:8081/api/diagnosis');
+      console.log('API Diagnosis response:', response.data);
+      
+      if (response.data && response.data.summary) {
+        // Display diagnosis results
+        alert(`API Diagnosis Results:
+        - API Key Valid: ${response.data.summary.isKeyValid ? 'Yes' : 'No'}
+        - Rate Limited: ${response.data.summary.isRateLimited ? 'Yes' : 'No'}
+        - Working Symbols: ${response.data.summary.workingSymbols || 'None'}
+        
+        Check the browser console for complete details.`);
+      } else {
+        throw new Error('Invalid diagnosis response format');
+      }
+    } catch (error) {
+      console.error('Diagnosis failed:', error);
+      alert(`Failed to run diagnosis: ${error.message || 'Unknown error'}`);
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
   return (
     <div className="dashboard-container">
-      {/* Header Section */}
+      {/* Header with refresh and diagnostic buttons */}
       <header className="dashboard-header">
-        <h1>Welcome, {currentUser?.email}</h1>
-        <div className="date-time">{new Date().toLocaleDateString()}</div>
+        <div className="header-left">
+          <h1>Welcome, {currentUser?.email}</h1>
+          <div className="last-update">
+            Last updated: {formatLastUpdated(lastFetched.market)}
+          </div>
+        </div>
+        <div className="header-right">
+          <button 
+            className="refresh-button" 
+            onClick={handleRefresh}
+            disabled={refreshing}
+          >
+            {refreshing ? 'Refreshing...' : 'Refresh Data'}
+          </button>
+          <button 
+            className="diagnostic-button" 
+            onClick={checkApiStatus}
+            disabled={refreshing}
+          >
+            Check API Status
+          </button>
+        </div>
       </header>
 
       {/* Main Grid Layout */}

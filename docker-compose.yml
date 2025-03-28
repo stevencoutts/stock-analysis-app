@@ -31,6 +31,7 @@ services:
       - NODE_ENV=production
       - DB_HOST=db
       - DB_PORT=5432
+      - ALPHA_VANTAGE_API_KEY=9FC95PXLEUFUU9TJ
     networks:
       - stock-network
     depends_on:
