@@ -11,13 +11,7 @@ BEGIN
 END
 $do$;
 
--- Create the database if it doesn't exist
-CREATE DATABASE stockdb WITH OWNER postgres;
-
--- Connect to the stockdb database
-\c stockdb;
-
--- Create users table if it doesn't exist
+-- Create users table
 CREATE TABLE IF NOT EXISTS users (
     id SERIAL PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
@@ -30,19 +24,29 @@ CREATE TABLE IF NOT EXISTS users (
     updated_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
--- Function to create admin user
-DO $$
-BEGIN
-    -- Check if admin user exists
-    IF NOT EXISTS (SELECT 1 FROM users WHERE email = 'admin@example.com') THEN
-        -- Create admin user with bcrypt hashed password 'admin123'
-        INSERT INTO users (name, email, password, role)
-        VALUES (
-            'Admin User',
-            'admin@example.com',
-            '$2a$12$K8HFqzBvgf7ORoiNrIcqU.NDziKL5/hcXWP/N9qYUvPXwxqhGbaXy',
-            'admin'
-        );
-        RAISE NOTICE 'Admin user created';
-    END IF;
-END $$; 
+-- Create system_settings table with nullable updated_by
+CREATE TABLE IF NOT EXISTS system_settings (
+    key VARCHAR(50) PRIMARY KEY,
+    value TEXT NOT NULL,
+    description TEXT,
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_by INTEGER NULL REFERENCES users(id)
+);
+
+-- Create initial admin user
+INSERT INTO users (name, email, password, role)
+VALUES (
+    'Admin User',
+    'admin@example.com',
+    '$2a$12$K8HFqzBvgf7ORoiNrIcqU.NDziKL5/hcXWP/N9qYUvPXwxqhGbaXy',
+    'admin'
+) ON CONFLICT (email) DO NOTHING;
+
+-- Insert default settings
+INSERT INTO system_settings (key, value, description, updated_by)
+VALUES (
+    'ALPHA_VANTAGE_API_KEY',
+    'CHANGEME',
+    'API key for Alpha Vantage stock data service',
+    NULL
+) ON CONFLICT (key) DO NOTHING; 

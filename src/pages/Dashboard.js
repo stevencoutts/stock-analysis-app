@@ -120,7 +120,7 @@ export default function Dashboard() {
               <button className="admin-menu-button">Admin ▾</button>
               <div className="admin-dropdown">
                 <Link to="/admin/users" className="admin-menu-item">User Management</Link>
-                <button className="admin-menu-item">System Settings</button>
+                <Link to="/admin/settings" className="admin-menu-item">System Settings</Link>
               </div>
             </div>
           )}

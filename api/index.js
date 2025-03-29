@@ -8,6 +8,7 @@ const path = require('path');
 const jwt = require('jsonwebtoken');
 const { initializeDatabase } = require('./db/init');
 const userService = require('./services/userService');
+const settingsService = require('./services/settingsService');
 
 const app = express();
 const port = process.env.PORT || 5000;
@@ -90,11 +91,17 @@ const authenticateToken = (req, res, next) => {
     return res.status(401).json({ error: 'Access token is required' });
   }
   
-  jwt.verify(token, process.env.JWT_SECRET || 'your_jwt_secret_key', (err, user) => {
+  jwt.verify(token, process.env.JWT_SECRET || 'your_jwt_secret_key', (err, decoded) => {
     if (err) {
       return res.status(403).json({ error: 'Invalid or expired token' });
     }
-    req.user = user;
+    
+    // Store the entire decoded token in req.user
+    req.user = {
+      id: decoded.userId,  // Make sure this matches what we set in login
+      email: decoded.email,
+      role: decoded.role
+    };
     next();
   });
 };
@@ -107,6 +114,37 @@ const requireAdmin = (req, res, next) => {
   next();
 };
 
+// Settings routes
+app.get('/api/settings', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    console.log('Fetching settings for user:', req.user); // Debug log
+    const settings = await settingsService.getAllSettings();
+    console.log('Retrieved settings:', settings); // Debug log
+    res.json(settings);
+  } catch (error) {
+    console.error('Error fetching settings:', error); // Debug log
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.put('/api/settings/:key', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { key } = req.params;
+    const { value } = req.body;
+    
+    if (!value) {
+      return res.status(400).json({ error: 'Value is required' });
+    }
+
+    console.log('Updating setting with user ID:', req.user.id); // Debug log
+    const setting = await settingsService.updateSetting(key, value, req.user.id);
+    res.json(setting);
+  } catch (error) {
+    console.error('Error updating setting:', error);
+    res.status(400).json({ error: error.message });
+  }
+});
+
 // Auth routes
 app.post('/api/auth/login', async (req, res) => {
   try {
@@ -115,7 +153,23 @@ app.post('/api/auth/login', async (req, res) => {
     const userAgent = req.headers['user-agent'];
     
     const result = await userService.authenticate(email, password, ipAddress, userAgent);
-    res.json(result);
+    
+    // Create token with userId (not id)
+    const token = jwt.sign(
+      { 
+        userId: result.user.id,  // Make sure this matches what we check in middleware
+        email: result.user.email,
+        role: result.user.role
+      },
+      process.env.JWT_SECRET || 'your_jwt_secret_key',
+      { expiresIn: '24h' }
+    );
+
+    res.json({
+      success: true,
+      user: result.user,
+      token
+    });
   } catch (error) {
     res.status(401).json({ error: error.message });
   }

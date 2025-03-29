@@ -12,7 +12,9 @@ const pool = new Pool({
 const initializeDatabase = async () => {
   const client = await pool.connect();
   try {
-    // Create users table with additional security fields
+    console.log('Initializing database...');
+    
+    // Create users table first
     await client.query(`
       CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
@@ -22,12 +24,19 @@ const initializeDatabase = async () => {
         role VARCHAR(20) NOT NULL DEFAULT 'user',
         status VARCHAR(20) NOT NULL DEFAULT 'active',
         last_login TIMESTAMP,
-        password_reset_token VARCHAR(100),
-        password_reset_expires TIMESTAMP,
-        failed_login_attempts INTEGER DEFAULT 0,
-        account_locked_until TIMESTAMP,
         created_at TIMESTAMP NOT NULL DEFAULT NOW(),
         updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+      )
+    `);
+
+    // Create system_settings table with nullable updated_by
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS system_settings (
+        key VARCHAR(50) PRIMARY KEY,
+        value TEXT NOT NULL,
+        description TEXT,
+        updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+        updated_by INTEGER NULL REFERENCES users(id)
       )
     `);
 
@@ -56,13 +65,12 @@ const initializeDatabase = async () => {
       )
     `);
 
-    // Check if admin user exists
+    // Create default admin user if none exists
     const adminResult = await client.query(
       'SELECT * FROM users WHERE email = $1',
       ['admin@example.com']
     );
 
-    // Create default admin user if none exists
     if (adminResult.rows.length === 0) {
       const hashedPassword = await bcrypt.hash('admin123', 12);
       await client.query(`
@@ -71,6 +79,17 @@ const initializeDatabase = async () => {
       `, ['Admin User', 'admin@example.com', hashedPassword, 'admin']);
       console.log('Created default admin user');
     }
+
+    // Insert default settings
+    await client.query(`
+      INSERT INTO system_settings (key, value, description, updated_by)
+      VALUES (
+        'ALPHA_VANTAGE_API_KEY',
+        'CHANGEME',
+        'API key for Alpha Vantage stock data service',
+        NULL
+      ) ON CONFLICT (key) DO NOTHING
+    `);
 
     console.log('Database initialization completed');
   } catch (err) {

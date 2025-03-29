@@ -1,5 +1,6 @@
 const { pool } = require('../db/init');
 const axios = require('axios');
+const settingsService = require('./settingsService');
 
 class StockDataService {
   constructor() {
@@ -88,8 +89,14 @@ class StockDataService {
       // Try to fetch new data if we can make an API call
       if (await this.canMakeApiCall(symbol)) {
         try {
+          const apiKey = await settingsService.getApiKey();
+          
+          if (apiKey === 'CHANGEME') {
+            throw new Error('API key not configured');
+          }
+
           const response = await axios.get(
-            `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${symbol}&apikey=${process.env.ALPHA_VANTAGE_API_KEY}`
+            `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${symbol}&apikey=${apiKey}`
           );
 
           if (response.data['Global Quote']) {
@@ -159,8 +166,14 @@ class StockDataService {
       // Try to fetch new data if we can make an API call
       if (await this.canMakeApiCall(symbol)) {
         try {
+          const apiKey = await settingsService.getApiKey();
+          
+          if (apiKey === 'CHANGEME') {
+            throw new Error('API key not configured');
+          }
+
           const response = await axios.get(
-            `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${symbol}&apikey=${process.env.ALPHA_VANTAGE_API_KEY}`
+            `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${symbol}&apikey=${apiKey}`
           );
 
           if (response.data['Time Series (Daily)']) {
