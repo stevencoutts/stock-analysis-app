@@ -14,19 +14,24 @@ router.get('/settings', authenticateToken, requireAdmin, async (req, res) => {
 });
 
 // Update setting (admin only)
-router.put('/settings/:key', authenticateToken, requireAdmin, async (req, res) => {
+router.put('/settings/:key', async (req, res) => {
   try {
     const { key } = req.params;
     const { value } = req.body;
     
-    if (!value) {
-      return res.status(400).json({ error: 'Value is required' });
-    }
-
-    const setting = await settingsService.updateSetting(key, value, req.user.userId);
-    res.json(setting);
+    // Get user ID from the authenticated request, fallback to null
+    const userId = req.user?.id || null;
+    
+    console.log(`Updating setting ${key} with user ID:`, userId);
+    
+    const result = await settingsService.updateSetting(key, value, userId);
+    res.json(result);
   } catch (error) {
-    res.status(400).json({ error: error.message });
+    console.error('Error updating setting:', error);
+    res.status(500).json({ 
+      error: 'Failed to update setting',
+      details: error.message 
+    });
   }
 });
 

@@ -9,17 +9,162 @@ class StockDataService {
     this.callsPerStock = Math.floor(this.DAILY_LIMIT / this.symbols.length);
   }
 
+  async getLatestStockPrice(symbol) {
+    const client = await pool.connect();
+    try {
+      const apiKey = await settingsService.getApiKey();
+      console.log(`Attempting to fetch data for ${symbol} with API key: ${apiKey ? 'Present' : 'Missing'}`);
+
+      if (apiKey && apiKey !== 'CHANGEME' && await this.canMakeApiCall(symbol)) {
+        try {
+          const url = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${symbol}&apikey=${apiKey}`;
+          console.log(`Making API call to: ${url}`);
+          
+          const response = await axios.get(url);
+          console.log(`Raw API Response for ${symbol}:`, response.data);
+
+          if (response.data['Global Quote'] && Object.keys(response.data['Global Quote']).length > 0) {
+            const quote = response.data['Global Quote'];
+            await this.recordApiCall();
+            
+            const newData = {
+              symbol,
+              price: parseFloat(quote['05. price']),
+              change_percent: parseFloat(quote['10. change percent'].replace('%', '')),
+              volume: parseInt(quote['06. volume']),
+              is_real_data: true,
+              fetch_time: new Date()
+            };
+
+            // Store in database
+            await client.query(`
+              INSERT INTO stock_prices (symbol, price, change_percent, volume, is_real_data, fetch_time)
+              VALUES ($1, $2, $3, $4, true, NOW())
+            `, [newData.symbol, newData.price, newData.change_percent, newData.volume]);
+
+            console.log(`Successfully fetched real data for ${symbol}:`, newData);
+            return newData;
+          } else {
+            throw new Error(`No quote data available for ${symbol}`);
+          }
+        } catch (error) {
+          console.error(`API call failed for ${symbol}:`, error.message);
+          throw error;
+        }
+      }
+    } catch (error) {
+      console.error(`Error in getLatestStockPrice for ${symbol}:`, error);
+      
+      // Try to get recent cached data
+      const cachedResult = await client.query(`
+        SELECT * FROM stock_prices 
+        WHERE symbol = $1 AND is_real_data = true 
+        AND fetch_time > NOW() - INTERVAL '15 minutes'
+        ORDER BY fetch_time DESC 
+        LIMIT 1
+      `, [symbol]);
+
+      if (cachedResult.rows.length > 0) {
+        console.log(`Using cached data for ${symbol}`);
+        return cachedResult.rows[0];
+      }
+
+      console.log(`Falling back to mock data for ${symbol}`);
+      return {
+        symbol,
+        price: 100 + Math.random() * 100,
+        change_percent: (Math.random() * 10 - 5).toFixed(2),
+        volume: Math.floor(Math.random() * 1000000),
+        is_real_data: false,
+        fetch_time: new Date()
+      };
+    } finally {
+      client.release();
+    }
+  }
+
+  async getStockHistory(symbol) {
+    const client = await pool.connect();
+    try {
+      if (await this.canMakeApiCall(symbol)) {
+        try {
+          const apiKey = await settingsService.getApiKey();
+          
+          if (apiKey && apiKey !== 'CHANGEME') {
+            console.log(`Fetching historical data for ${symbol}`);
+            const response = await axios.get(
+              `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${symbol}&apikey=${apiKey}`
+            );
+
+            if (response.data['Time Series (Daily)']) {
+              await this.recordApiCall();
+              
+              const timeSeriesData = response.data['Time Series (Daily)'];
+              const entries = Object.entries(timeSeriesData);
+              
+              // Store in database
+              for (let i = 0; i < Math.min(30, entries.length); i++) {
+                const [date, values] = entries[i];
+                await client.query(`
+                  INSERT INTO stock_history (symbol, date, price, volume, is_real_data)
+                  VALUES ($1, $2, $3, $4, true)
+                  ON CONFLICT (symbol, date) 
+                  DO UPDATE SET price = $3, volume = $4, is_real_data = true
+                `, [
+                  symbol,
+                  date,
+                  parseFloat(values['4. close']),
+                  parseInt(values['5. volume'])
+                ]);
+              }
+
+              // Return real data
+              const historyResult = await client.query(`
+                SELECT *
+                FROM stock_history
+                WHERE symbol = $1 AND is_real_data = true
+                ORDER BY date DESC
+                LIMIT 30
+              `, [symbol]);
+
+              return historyResult.rows;
+            }
+          }
+        } catch (error) {
+          console.error(`Error fetching historical data for ${symbol}:`, error);
+        }
+      }
+
+      // Get existing real data from database
+      const result = await client.query(`
+        SELECT *
+        FROM stock_history
+        WHERE symbol = $1 AND is_real_data = true
+        ORDER BY date DESC
+        LIMIT 30
+      `, [symbol]);
+
+      if (result.rows.length > 0) {
+        return result.rows;
+      }
+
+      // Only use simulated data if we have no real data
+      return this.generateMockHistory(symbol);
+    } finally {
+      client.release();
+    }
+  }
+
   async canMakeApiCall(symbol) {
     const client = await pool.connect();
     try {
       const today = new Date().toISOString().split('T')[0];
       
       // Get or create today's API call record
-      const result = await client.query(`
+      await client.query(`
         INSERT INTO api_calls (call_date, call_count)
         VALUES ($1, 0)
         ON CONFLICT (call_date) DO NOTHING
-        RETURNING *
       `, [today]);
 
       // Get current call count
@@ -33,13 +178,15 @@ class StockDataService {
 
       // Check if we've exceeded daily limit
       if (call_count >= this.DAILY_LIMIT) {
+        console.log('Daily API limit reached');
         return false;
       }
 
-      // Ensure minimum 1-hour gap between calls for the same stock
+      // Ensure minimum 5-minute gap between calls for the same stock
       if (last_call) {
-        const hoursSinceLastCall = (Date.now() - new Date(last_call).getTime()) / (1000 * 60 * 60);
-        if (hoursSinceLastCall < 1) {
+        const minutesSinceLastCall = (Date.now() - new Date(last_call).getTime()) / (1000 * 60);
+        if (minutesSinceLastCall < 5) {
+          console.log('Too soon since last API call');
           return false;
         }
       }
@@ -60,174 +207,6 @@ class StockDataService {
             last_call = NOW()
         WHERE call_date = $1
       `, [today]);
-    } finally {
-      client.release();
-    }
-  }
-
-  async getLatestStockPrice(symbol) {
-    const client = await pool.connect();
-    try {
-      // Get the most recent price from database
-      const result = await client.query(`
-        SELECT *
-        FROM stock_prices
-        WHERE symbol = $1
-        ORDER BY fetch_time DESC
-        LIMIT 1
-      `, [symbol]);
-
-      // If we have recent data (less than 1 hour old), return it
-      if (result.rows.length > 0) {
-        const data = result.rows[0];
-        const age = (Date.now() - new Date(data.fetch_time).getTime()) / (1000 * 60 * 60);
-        if (age < 1) {
-          return data;
-        }
-      }
-
-      // Try to fetch new data if we can make an API call
-      if (await this.canMakeApiCall(symbol)) {
-        try {
-          const apiKey = await settingsService.getApiKey();
-          
-          if (apiKey === 'CHANGEME') {
-            throw new Error('API key not configured');
-          }
-
-          const response = await axios.get(
-            `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${symbol}&apikey=${apiKey}`
-          );
-
-          if (response.data['Global Quote']) {
-            await this.recordApiCall();
-            
-            const quote = response.data['Global Quote'];
-            const newData = {
-              symbol,
-              price: parseFloat(quote['05. price']),
-              change_percent: parseFloat(quote['10. change percent'].replace('%', '')),
-              volume: parseInt(quote['06. volume']),
-              is_real_data: true
-            };
-
-            // Store in database
-            await client.query(`
-              INSERT INTO stock_prices (symbol, price, change_percent, volume, is_real_data)
-              VALUES ($1, $2, $3, $4, $5)
-            `, [newData.symbol, newData.price, newData.change_percent, newData.volume, newData.is_real_data]);
-
-            return newData;
-          }
-        } catch (error) {
-          console.error(`Error fetching real data for ${symbol}:`, error);
-        }
-      }
-
-      // Return most recent data from database, even if old
-      if (result.rows.length > 0) {
-        return result.rows[0];
-      }
-
-      // Generate mock data as last resort
-      const mockData = this.generateMockPrice(symbol);
-      await client.query(`
-        INSERT INTO stock_prices (symbol, price, change_percent, volume, is_real_data)
-        VALUES ($1, $2, $3, $4, false)
-      `, [symbol, mockData.price, mockData.change_percent, mockData.volume]);
-
-      return mockData;
-    } finally {
-      client.release();
-    }
-  }
-
-  async getStockHistory(symbol) {
-    const client = await pool.connect();
-    try {
-      // Get existing history from database
-      const result = await client.query(`
-        SELECT *
-        FROM stock_history
-        WHERE symbol = $1
-        ORDER BY date DESC
-        LIMIT 30
-      `, [symbol]);
-
-      // If we have enough recent data, return it
-      if (result.rows.length >= 30) {
-        const mostRecentDate = new Date(result.rows[0].date);
-        const age = (Date.now() - mostRecentDate.getTime()) / (1000 * 60 * 60 * 24);
-        if (age < 1) {
-          return result.rows;
-        }
-      }
-
-      // Try to fetch new data if we can make an API call
-      if (await this.canMakeApiCall(symbol)) {
-        try {
-          const apiKey = await settingsService.getApiKey();
-          
-          if (apiKey === 'CHANGEME') {
-            throw new Error('API key not configured');
-          }
-
-          const response = await axios.get(
-            `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${symbol}&apikey=${apiKey}`
-          );
-
-          if (response.data['Time Series (Daily)']) {
-            await this.recordApiCall();
-            
-            const timeSeriesData = response.data['Time Series (Daily)'];
-            const entries = Object.entries(timeSeriesData);
-            
-            // Store in database
-            for (let i = 0; i < Math.min(30, entries.length); i++) {
-              const [date, values] = entries[i];
-              await client.query(`
-                INSERT INTO stock_history (symbol, date, price, volume, is_real_data)
-                VALUES ($1, $2, $3, $4, true)
-                ON CONFLICT (symbol, date) DO UPDATE
-                SET price = $3, volume = $4, fetch_time = NOW()
-              `, [
-                symbol,
-                date,
-                parseFloat(values['4. close']),
-                parseInt(values['5. volume'])
-              ]);
-            }
-
-            // Return updated data
-            return (await client.query(`
-              SELECT *
-              FROM stock_history
-              WHERE symbol = $1
-              ORDER BY date DESC
-              LIMIT 30
-            `, [symbol])).rows;
-          }
-        } catch (error) {
-          console.error(`Error fetching history for ${symbol}:`, error);
-        }
-      }
-
-      // If we have any data in database, return it
-      if (result.rows.length > 0) {
-        return result.rows;
-      }
-
-      // Generate mock history as last resort
-      const mockHistory = this.generateMockHistory(symbol);
-      for (const entry of mockHistory) {
-        await client.query(`
-          INSERT INTO stock_history (symbol, date, price, volume, is_real_data)
-          VALUES ($1, $2, $3, $4, false)
-          ON CONFLICT (symbol, date) DO NOTHING
-        `, [symbol, entry.date, entry.price, entry.volume]);
-      }
-
-      return mockHistory;
     } finally {
       client.release();
     }

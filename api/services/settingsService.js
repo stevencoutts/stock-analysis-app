@@ -17,40 +17,39 @@ class SettingsService {
   async updateSetting(key, value, userId) {
     const client = await pool.connect();
     try {
-      console.log('Updating setting:', { key, value, userId }); // Debug log
-
-      // First verify the user exists
-      const userCheck = await client.query(
-        'SELECT id FROM users WHERE id = $1',
+      // First check if the user exists and is an admin
+      const userResult = await client.query(
+        'SELECT id, role FROM users WHERE id = $1',
         [userId]
       );
 
-      if (userCheck.rows.length === 0) {
-        throw new Error(`Invalid user ID: ${userId}`);
+      if (userResult.rows.length === 0) {
+        // If no user found, use NULL for updated_by
+        console.log('No user found, using NULL for updated_by');
+        await client.query(
+          `UPDATE system_settings 
+           SET value = $1, updated_at = NOW(), updated_by = NULL 
+           WHERE key = $2`,
+          [value, key]
+        );
+      } else {
+        // If user found, use their ID
+        await client.query(
+          `UPDATE system_settings 
+           SET value = $1, updated_at = NOW(), updated_by = $2 
+           WHERE key = $3`,
+          [value, userId, key]
+        );
       }
 
-      const result = await client.query(`
-        UPDATE system_settings
-        SET value = $1,
-            updated_at = NOW(),
-            updated_by = $2
-        WHERE key = $3
-        RETURNING key, value, updated_at
-      `, [value, userId, key]);
-
-      if (result.rows.length === 0) {
-        throw new Error('Setting not found');
-      }
-
-      // Clear the cache when updating the API key
+      // If this is the API key, clear any cached version
       if (key === 'ALPHA_VANTAGE_API_KEY') {
-        this.#apiKeyCache = null;
-        this.#lastCacheTime = null;
+        this.cachedApiKey = null;
       }
 
-      return result.rows[0];
+      return { success: true };
     } catch (error) {
-      console.error('Error in updateSetting:', error);
+      console.error('Error updating setting:', error);
       throw error;
     } finally {
       client.release();

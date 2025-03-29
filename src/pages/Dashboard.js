@@ -34,18 +34,33 @@ export default function Dashboard() {
   const [selectedStock, setSelectedStock] = useState('AAPL');
   const [stockData, setStockData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [lastFetched, setLastFetched] = useState({ market: null, stock: null });
+  const [error, setError] = useState(null);
+  const [lastUpdated, setLastUpdated] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [diagnosing, setDiagnosing] = useState(false);
 
   const fetchMarketData = useCallback(async () => {
     try {
-      const response = await axios.get('http://localhost:8081/api/market-overview');
-      setMarketData(response.data.data);
-      setLastFetched(prev => ({ ...prev, market: new Date() }));
-      setError('');
+      setLoading(true);
+      setError(null);
+      console.log('Fetching market data...');
+      
+      const response = await fetch('/api/market-overview');
+      const data = await response.json();
+      
+      console.log('Received market data:', data);
+      
+      if (data.data && Array.isArray(data.data)) {
+        setMarketData(data.data);
+        setLastUpdated(data.lastUpdated);
+      } else {
+        throw new Error('Invalid data format received');
+      }
     } catch (err) {
-      setError('Failed to fetch market data');
+      console.error('Error fetching market data:', err);
+      setError(err.message);
+    } finally {
+      setLoading(false);
     }
   }, []);
 
@@ -53,7 +68,6 @@ export default function Dashboard() {
     try {
       const response = await axios.get(`http://localhost:8081/api/stock-performance/${symbol}`);
       setStockData(response.data);
-      setLastFetched(prev => ({ ...prev, stock: new Date() }));
       setError('');
     } catch (err) {
       console.error('Error fetching stock data:', err);
@@ -89,16 +103,19 @@ export default function Dashboard() {
 
   const formatLastUpdated = (date) => {
     if (!date) return 'Never';
-    return new Date(date).toLocaleTimeString();
+    return new Date(date).toLocaleString();
   };
 
   const checkApiStatus = async () => {
     try {
-      const response = await axios.get('http://localhost:8081/api/diagnosis');
-      alert(JSON.stringify(response.data, null, 2));
+      setDiagnosing(true);
+      const response = await fetch('/api/diagnose-api');
+      const data = await response.json();
+      alert(JSON.stringify(data, null, 2));
     } catch (error) {
-      alert('Failed to run diagnosis. Check console for details.');
-      console.error('Diagnosis error:', error);
+      alert('Failed to check API status: ' + error.message);
+    } finally {
+      setDiagnosing(false);
     }
   };
 
@@ -111,7 +128,7 @@ export default function Dashboard() {
             Role: <span className="role-badge">{currentUser?.role || 'User'}</span>
           </div>
           <div className="last-update">
-            Last updated: {formatLastUpdated(lastFetched.market)}
+            Last updated: {formatLastUpdated(lastUpdated)}
           </div>
         </div>
         <div className="header-actions">
@@ -132,10 +149,11 @@ export default function Dashboard() {
             {refreshing ? 'Refreshing...' : 'Refresh Data'}
           </button>
           <button 
-            className="diagnostic-button" 
-            onClick={checkApiStatus}
+            onClick={checkApiStatus} 
+            disabled={diagnosing}
+            className="diagnose-button"
           >
-            Check API Status
+            {diagnosing ? 'Checking API...' : 'Check API Status'}
           </button>
           <button onClick={handleLogout} className="logout-button">
             Logout
@@ -152,20 +170,29 @@ export default function Dashboard() {
       <div className="dashboard-content">
         <div className="market-overview">
           <h2>Market Overview</h2>
-          <div className="stock-grid">
-            {marketData.map((stock) => (
-              <div key={stock.symbol} className="stock-card">
-                <h3>{stock.symbol}</h3>
-                <div className="stock-price">${stock.price}</div>
-                <div className={`stock-change ${parseFloat(stock.change_percent) >= 0 ? 'positive' : 'negative'}`}>
-                  {stock.change_percent}
+          {loading && <div>Loading...</div>}
+          {!loading && !error && marketData.length === 0 && (
+            <div>No market data available</div>
+          )}
+          {!loading && !error && marketData.length > 0 && (
+            <div className="stock-grid">
+              {marketData.map((stock) => (
+                <div key={stock.symbol} className="stock-card">
+                  <h3>{stock.symbol}</h3>
+                  <div className="stock-price">${typeof stock.price === 'number' ? stock.price.toFixed(2) : 'N/A'}</div>
+                  <div className={`stock-change ${parseFloat(stock.change_percent) >= 0 ? 'positive' : 'negative'}`}>
+                    {typeof stock.change_percent === 'number' ? stock.change_percent.toFixed(2) : '0.00'}%
+                  </div>
+                  <div className="volume">
+                    Vol: {stock.volume?.toLocaleString() || 'N/A'}
+                  </div>
+                  <div className={`data-source ${stock.is_real_data ? 'real' : 'simulated'}`}>
+                    {stock.is_real_data ? 'Real Data' : 'Simulated'}
+                  </div>
                 </div>
-                {!stock.is_real_data && (
-                  <div className="mock-data-tag">Simulated Data</div>
-                )}
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="stock-performance">
